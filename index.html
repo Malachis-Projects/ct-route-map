@@ -146,7 +146,7 @@
   </section>
 
   <section>
-    <h2>Trip plan</h2>
+    <h2>Trip plan <button class="link" id="shareBtn">Copy share link</button></h2>
     <div id="routeOut" class="hint" style="margin:0"></div>
   </section>
 
@@ -664,6 +664,35 @@ $('drawBtn').onclick = () => buildRoute(false);
 ['roundTrip', 'mainRoads', 'goal'].forEach(id => $(id).onchange = () => { if (plan) buildRoute(plan.optimized); });
 setDepart(Math.ceil((Date.now() + 10 * 60000) / (30 * 60000)) * 30 * 60000);   // next half hour
 
+// ---------- Share a route by link ----------
+// The whole route rides in the URL hash (never sent to a server): stops, leaving time, minutes per stop, options.
+const b64url = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64url = s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+function routeLink() {
+  const data = { s: active().map(p => [+p.lat.toFixed(6), +p.lng.toFixed(6), p.label]),
+    rt: $('roundTrip').checked ? 1 : 0, mr: $('mainRoads').checked ? 1 : 0, d: $('depart').value, dw: +$('dwell').value };
+  return location.origin + location.pathname + '#r=' + b64url(JSON.stringify(data));
+}
+function loadLink() {
+  const m = location.hash.match(/^#r=([\w-]+)/);
+  if (!m) return false;
+  try {
+    const data = JSON.parse(unb64url(m[1]));
+    points = data.s.map(([lat, lng, label]) => ({ lat, lng, label, on: true, town: townAt(lat, lng) || '' }));
+    $('roundTrip').checked = !!data.rt; $('mainRoads').checked = !!data.mr;
+    if (data.dw != null) $('dwell').value = data.dw;
+    if (data.d) $('depart').value = data.d;
+    history.replaceState(null, '', location.pathname);   // stops are now saved locally; edits survive a reload
+    return true;
+  } catch { return false; }
+}
+$('shareBtn').onclick = () => {
+  if (active().length < 2) { showHover('Add at least two stops first', 1800); return; }
+  const url = routeLink();
+  navigator.clipboard.writeText(url).then(() => showHover('Link copied', 1500)).catch(() => prompt('Copy this link:', url));
+};
+const fromLink = loadLink();
+
 // Keep the map sized to its container; frame the whole state until the user moves it.
 map.on('mousedown wheel touchstart', () => { userMoved = true; });
 new ResizeObserver(() => {
@@ -674,6 +703,7 @@ new ResizeObserver(() => {
 renderTowns();
 renderPoints();
 renderPlan();
+if (fromLink) buildRoute(false);   // a shared link keeps its stop order
 </script>
 </body>
 </html>

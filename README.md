@@ -18,6 +18,7 @@ It is a single web page with no build step, no server and no API keys.
 - Each stop is tagged with the town it falls in.
 - Each stop has a checkbox, so it can be left out of a route without deleting it.
 - Stops are remembered in the browser between visits.
+- **Share link.** "Copy share link" puts the whole route (stops, order, leaving time, minutes per stop) into a link. Opening it loads the route in the order given. The route travels in the link itself and is never sent to a server.
 
 ### Route optimization
 - Stop 1 is the starting point. The remaining stops are reordered to minimise either **drive time** or **distance (least gas)**.
