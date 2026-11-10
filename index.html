@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connecticut Route Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #16202c; --muted: #66727f;
+    --line: #dfe3e8; --accent: #0b6e4f; --accent-soft: #e3f3ec; --pin: #d9480f;
+    --route: #1c64f2; --warn: #9a5b00; --warn-soft: #fff4dc;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: var(--bg); }
+  aside { width: 360px; flex: none; overflow-y: auto; background: var(--panel); border-right: 1px solid var(--line); }
+  header { padding: 16px 16px 12px; border-bottom: 1px solid var(--line); }
+  h1 { font-size: 17px; margin: 0 0 2px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  section { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+  h2 button { font-size: 11px; text-transform: none; letter-spacing: 0; }
+  input[type=text], input[type=number], input[type=datetime-local], select, textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; font: inherit; background: #fff; color: var(--ink); }
+  textarea { resize: vertical; min-height: 84px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink); border-radius: 7px; padding: 7px 10px; }
+  button:hover { background: var(--bg); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover { background: #095c42; }
+  button:disabled { opacity: .55; cursor: default; }
+  button.link { border: 0; background: none; padding: 0; color: var(--accent); }
+  .row { display: flex; gap: 6px; }
+  .row > * { flex: 1; min-width: 0; }
+  .row > button { flex: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  label.f { display: block; font-size: 11.5px; color: var(--muted); }
+  label.f > * { margin-top: 3px; }
+  .check { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 13px; cursor: pointer; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 8px; }
+  .seg button[aria-pressed=true] { background: var(--accent); color: #fff; }
+  .hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .ac { position: relative; }
+  .results { list-style: none; margin: 4px 0 0; padding: 4px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.08); }
+  .results:empty { display: none; }
+  .results li { padding: 7px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .results li:hover, .results li.hi { background: var(--accent-soft); }
+  .results li small { display: block; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { background: var(--accent-soft); color: var(--accent); border-radius: 99px; padding: 3px 9px; font-size: 12.5px; cursor: pointer; border: 0; }
+  .chip:hover { background: #cfe9dd; }
+  .empty { color: var(--muted); font-size: 12.5px; }
+  .list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+  .list li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  .list li:hover { background: var(--bg); }
+  .list li.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .list small { margin-left: auto; color: var(--muted); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .pt { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; font-size: 13px; }
+  .pt input { margin: 4px 0 0; accent-color: var(--accent); }
+  .pt b { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--pin); color: #fff; font-size: 11px; display: grid; place-items: center; margin-top: 1px; }
+  .pt.off { opacity: .5; } .pt.off b { background: #9aa3ad; }
+  .pt .body { flex: 1; min-width: 0; cursor: pointer; }
+  .pt small { display: block; color: var(--muted); }
+  .pt .eta { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .pt button { border: 0; padding: 0 4px; color: var(--muted); background: none; font-size: 16px; line-height: 1; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stats div { background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+  .stats strong { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stats span { font-size: 11.5px; color: var(--muted); }
+  .note { margin-top: 8px; font-size: 12.5px; }
+  .note.good { color: var(--accent); font-weight: 600; }
+  .note.warn { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 7px 10px; }
+  .chart { display: flex; align-items: flex-end; gap: 2px; height: 64px; margin-top: 10px; }
+  .chart i { flex: 1; background: #c9d1da; border-radius: 2px 2px 0 0; cursor: pointer; min-height: 3px; }
+  .chart i:hover { background: #8d99a6; }
+  .chart i.best { background: var(--accent); }
+  .chart i.sel { background: var(--route); }
+  .chart i.past { opacity: .3; cursor: default; }
+  .axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .legend { font-size: 11.5px; color: var(--muted); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; }
+  #wrap { position: relative; flex: 1; display: flex; min-width: 0; }
+  #map { flex: 1; min-width: 0; background: #dfe7ea; }
+  #map.dropping { cursor: crosshair; }
+  .town-label { background: none; border: 0; box-shadow: none; color: #0b3d2e; font-weight: 600; font-size: 11px; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff; padding: 0; }
+  .town-label::before { display: none; }
+  .hide-labels .town-label { display: none; }
+  .pin { background: var(--pin); color: #fff; border: 2px solid #fff; border-radius: 50%; width: 26px; height: 26px; display: grid; place-items: center; font: 600 12px system-ui; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .pin.off { background: #9aa3ad; }
+  #hover { position: absolute; z-index: 500; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(22,32,44,.88); color: #fff; padding: 5px 12px; border-radius: 99px; font-size: 13px; pointer-events: none; opacity: 0; transition: opacity .12s; white-space: nowrap; }
+  @media (max-width: 720px) {
+    body { flex-direction: column-reverse; }
+    aside { width: 100%; height: 50%; border-right: 0; border-top: 1px solid var(--line); }
+    #wrap { height: 50%; flex: none; }
+  }
+</style>
+</head>
+<body>
+<aside>
+  <header>
+    <h1>Connecticut Route Map</h1>
+    <p>169 towns · addresses · traffic, weather and gas planning</p>
+  </header>
+
+  <section>
+    <h2>Add an address <button class="link" id="bulkToggle">Paste a list</button></h2>
+    <div class="ac" id="single">
+      <input type="text" id="addr" placeholder="Start typing, e.g. 165 Capitol Ave, Hartford" autocomplete="off">
+      <ul class="results" id="addrResults"></ul>
+    </div>
+    <div id="bulk" hidden>
+      <textarea id="bulkText" placeholder="One address per line&#10;165 Capitol Ave, Hartford&#10;250 Temple St, New Haven"></textarea>
+      <div class="row" style="margin-top:6px"><span class="hint" id="bulkMsg" style="margin:0;align-self:center"></span><button class="primary" id="bulkGo">Add all</button></div>
+    </div>
+    <div class="seg" style="margin-top:10px">
+      <button id="modeTown" aria-pressed="true">Click selects towns</button>
+      <button id="modePoint" aria-pressed="false">Click drops a stop</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Stops <button class="link" id="clearPts">Clear</button></h2>
+    <div id="pts"></div>
+  </section>
+
+  <section>
+    <h2>Trip settings</h2>
+    <label class="f">Leaving at <input type="datetime-local" id="depart" step="900"></label>
+    <div class="grid3" style="margin-top:8px">
+      <label class="f">Min per stop <input type="number" id="dwell" min="0" max="480" step="5" value="30"></label>
+      <label class="f">Car MPG <input type="number" id="mpg" min="5" max="150" step="1" value="25"></label>
+      <label class="f">Gas $/gal <input type="number" id="gas" min="0" step="0.05" value="3.20"></label>
+    </div>
+    <label class="f" style="margin-top:8px">Optimize for
+      <select id="goal"><option value="time">Shortest drive time</option><option value="dist">Least gas (shortest distance)</option></select>
+    </label>
+    <label class="check"><input type="checkbox" id="mainRoads"> Stick to main roads (avoid back roads)</label>
+    <label class="check"><input type="checkbox" id="roundTrip" checked> Return to stop 1 at the end</label>
+    <div class="row" style="margin-top:10px">
+      <button id="optBtn" class="primary" style="flex:1">Optimize route</button>
+      <button id="drawBtn" title="Route in the order listed, without reordering">As listed</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Trip plan</h2>
+    <div id="routeOut" class="hint" style="margin:0"></div>
+  </section>
+
+  <section>
+    <h2>Selected towns <button class="link" id="clearSel">Clear</button></h2>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section>
+    <h2>All towns</h2>
+    <input type="text" id="townFilter" placeholder="Filter towns…" autocomplete="off">
+    <ul class="list" id="townList"></ul>
+  </section>
+</aside>
+
+<div id="wrap">
+  <div id="map"></div>
+  <div id="hover"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data/ct-towns.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const CT_BOUNDS = L.latLngBounds([40.95, -73.75], [42.06, -71.78]);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+let userMoved = false;
+let plan = null;      // last built route: { legs:[{dur,dist}], latlngs, climbM, order saved, ... }
+let weather = null;   // hourly forecast per active stop
+
+// ---------- Map + base layers ----------
+const map = L.map('map', { zoomSnap: 0.25, minZoom: 8, maxBounds: CT_BOUNDS.pad(0.6) }).fitBounds(CT_BOUNDS);
+const base = {
+  'Streets': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }),
+  'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { maxZoom: 20, attribution: '&copy; OpenStreetMap contributors &copy; CARTO' }),
+  'Terrain': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap' }),
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery &copy; Esri' }),
+};
+base['Streets'].addTo(map);
+L.control.scale({ metric: false }).addTo(map);
+
+// ---------- Town outlines ----------
+const selected = new Set();
+const layersByName = {};
+const styleFor = name => selected.has(name)
+  ? { color: '#0b6e4f', weight: 3, fillColor: '#0b6e4f', fillOpacity: 0.28 }
+  : { color: '#0b6e4f', weight: 1.2, fillColor: '#0b6e4f', fillOpacity: 0.04 };
+
+const towns = L.geoJSON(window.CT_TOWNS, {
+  style: f => styleFor(f.properties.name),
+  onEachFeature(f, layer) {
+    const name = f.properties.name;
+    layersByName[name] = layer;
+    layer.bindTooltip(name, { permanent: true, direction: 'center', className: 'town-label', interactive: false });
+    layer.on({
+      mouseover() { if (!selected.has(name)) layer.setStyle({ weight: 2.5, fillOpacity: 0.14 }); showHover(`${name} · ${f.properties.sqmi} sq mi`); },
+      mouseout() { layer.setStyle(styleFor(name)); showHover(''); },
+      click(e) { if (mode === 'point') return; L.DomEvent.stopPropagation(e); toggleTown(name); },
+    });
+  },
+}).addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+const pinLayer = L.layerGroup().addTo(map);
+L.control.layers(base, { 'Town outlines': towns }, { collapsed: false }).addTo(map);
+
+let hoverTimer;
+function showHover(text, ms) {
+  const h = $('hover'); h.textContent = text; h.style.opacity = text ? 1 : 0;
+  clearTimeout(hoverTimer); if (ms) hoverTimer = setTimeout(() => showHover(''), ms);
+}
+function syncLabels() { $('map').classList.toggle('hide-labels', map.getZoom() < 10.5); }
+map.on('zoomend', syncLabels); syncLabels();
+
+function toggleTown(name, zoom) {
+  selected.has(name) ? selected.delete(name) : selected.add(name);
+  layersByName[name].setStyle(styleFor(name));
+  if (zoom && selected.has(name)) map.fitBounds(layersByName[name].getBounds(), { padding: [40, 40] });
+  renderTowns();
+}
+function renderTowns() {
+  const q = $('townFilter').value.trim().toLowerCase();
+  $('townList').innerHTML = '';
+  for (const f of window.CT_TOWNS.features) {
+    const { name, sqmi } = f.properties;
+    if (q && !name.toLowerCase().includes(q)) continue;
+    const li = document.createElement('li');
+    li.className = selected.has(name) ? 'on' : '';
+    li.innerHTML = `<span></span><small>${sqmi} mi²</small>`;
+    li.firstChild.textContent = name;
+    li.onclick = () => toggleTown(name, true);
+    $('townList').append(li);
+  }
+  const chips = $('chips');
+  chips.innerHTML = selected.size ? '' : '<span class="empty">Click any town to section it off.</span>';
+  [...selected].sort().forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'chip'; b.textContent = name + ' ×'; b.title = 'Remove';
+    b.onclick = () => toggleTown(name);
+    chips.append(b);
+  });
+}
+$('townFilter').oninput = renderTowns;
+$('clearSel').onclick = () => { [...selected].forEach(n => { selected.delete(n); layersByName[n].setStyle(styleFor(n)); }); renderTowns(); };
+
+// ---------- Which town is a point in? (ray casting) ----------
+function inRing(lng, lat, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i], [xj, yj] = ring[j];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function townAt(lat, lng) {
+  for (const f of window.CT_TOWNS.features) {
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    for (const p of polys) if (inRing(lng, lat, p[0]) && !p.slice(1).some(h => inRing(lng, lat, h))) return f.properties.name;
+  }
+  return null;
+}
+
+// ---------- Stops ----------
+let points = store.get('ct-stops', []).map(p => ({ on: true, ...p }));
+const active = () => points.filter(p => p.on);
+const fmtClock = ms => new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fmtDur = s => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+
+function addPoint(lat, lng, label) {
+  const town = townAt(lat, lng);
+  if (!town) { showHover('That spot is outside Connecticut', 1800); return false; }
+  points.push({ lat, lng, town, on: true, label: label || `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+  stopsChanged();
+  return true;
+}
+function stopsChanged() { plan = null; weather = null; routeLayer.clearLayers(); renderPoints(); renderPlan(); }
+
+function renderPoints() {
+  store.set('ct-stops', points);
+  pinLayer.clearLayers();
+  const box = $('pts');
+  box.innerHTML = points.length ? '' : '<div class="empty">No stops yet. Type an address above, paste a list, or drop one on the map.</div>';
+  const sim = plan ? simulate(departMs()) : null;
+  let n = 0;
+  points.forEach((p, i) => {
+    const k = p.on ? n++ : -1;
+    const m = L.marker([p.lat, p.lng], {
+      icon: L.divIcon({ className: '', html: `<div class="pin ${p.on ? '' : 'off'}">${p.on ? k + 1 : ''}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
+    }).addTo(pinLayer);
+    m.bindPopup(document.createTextNode(`${p.label} — ${p.town}`));
+    const row = document.createElement('div');
+    row.className = 'pt' + (p.on ? '' : ' off');
+    row.innerHTML = `<input type="checkbox" title="Include in route" ${p.on ? 'checked' : ''}><b>${p.on ? k + 1 : '–'}</b>
+      <div class="body"><span></span><small></small><small class="eta"></small></div><button title="Remove">×</button>`;
+    row.querySelector('span').textContent = p.label;
+    row.querySelector('small').textContent = p.town;
+    if (sim && p.on) {
+      const t = sim.arrive[k], w = wxAt(k, t);
+      row.querySelector('.eta').textContent = (k === 0 ? `Leave ${fmtClock(t)}` : `Arrive ${fmtClock(t)}`) + (w ? `  ·  ${wxIcon(w)} ${Math.round(w.temp)}°F` + (w.pp >= 30 ? `, ${w.pp}% precip` : '') : '');
+    }
+    row.querySelector('input').onchange = e => { p.on = e.target.checked; stopsChanged(); };
+    row.querySelector('.body').onclick = () => { map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15)); m.openPopup(); };
+    row.querySelector('button').onclick = () => { points.splice(i, 1); stopsChanged(); };
+    box.append(row);
+  });
+}
+$('clearPts').onclick = () => { points = []; stopsChanged(); };
+
+// ---------- Click mode ----------
+let mode = 'town';
+function setMode(m) {
+  mode = m;
+  $('modeTown').setAttribute('aria-pressed', m === 'town');
+  $('modePoint').setAttribute('aria-pressed', m === 'point');
+  $('map').classList.toggle('dropping', m === 'point');
+}
+$('modeTown').onclick = () => setMode('town');
+$('modePoint').onclick = () => setMode('point');
+map.on('click', e => { if (mode === 'point') addPoint(e.latlng.lat, e.latlng.lng); });
+
+// ---------- Address lookup (Photon / OpenStreetMap, limited to Connecticut) ----------
+async function geocode(q, limit) {
+  const url = 'https://photon.komoot.io/api/?' + new URLSearchParams({ q, limit: limit * 2, lang: 'en', bbox: '-73.75,40.95,-71.78,42.06', lat: 41.6, lon: -72.7 });
+  const data = await (await fetch(url)).json();
+  const seen = new Set();
+  return (data.features || []).map(f => {
+    const p = f.properties, [lng, lat] = f.geometry.coordinates;
+    const street = p.housenumber && p.street ? `${p.housenumber} ${p.street}` : (p.street && p.name !== p.street ? null : p.street);
+    const title = [p.name && p.name !== street ? p.name : null, street].filter(Boolean).join(', ') || p.name || p.street || p.city || q;
+    const place = [p.city || p.town || p.village, p.postcode].filter(Boolean).join(' ');
+    return { lat, lng, title, place, town: townAt(lat, lng) };
+  }).filter(h => h.town && !seen.has(h.title + h.place) && seen.add(h.title + h.place)).slice(0, limit);
+}
+let acTimer, acSeq = 0, acHits = [], acIdx = -1;
+function showHits(hits, msg) {
+  acHits = hits; acIdx = -1;
+  const out = $('addrResults'); out.innerHTML = '';
+  if (msg) { out.innerHTML = `<li class="empty">${msg}</li>`; return; }
+  hits.forEach((h, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<span></span><small></small>';
+    li.firstChild.textContent = h.title; li.lastChild.textContent = h.place || h.town;
+    li.onmousedown = e => { e.preventDefault(); pickHit(i); };
+    out.append(li);
+  });
+}
+function pickHit(i) {
+  const h = acHits[i]; if (!h) return;
+  addPoint(h.lat, h.lng, h.title + (h.place ? `, ${h.place.replace(/ \d{5}$/, '')}` : ''));
+  map.setView([h.lat, h.lng], 15); userMoved = true;
+  $('addr').value = ''; showHits([]);
+}
+async function lookup() {
+  const q = $('addr').value.trim(), seq = ++acSeq;
+  if (q.length < 3) { showHits([]); return; }
+  try {
+    const hits = await geocode(q, 5);
+    if (seq === acSeq) showHits(hits, hits.length ? '' : 'No Connecticut match yet. Try adding the town name.');
+  } catch { if (seq === acSeq) showHits([], 'Lookup failed. Check your connection.'); }
+}
+$('addr').oninput = () => { clearTimeout(acTimer); acTimer = setTimeout(lookup, 280); };
+$('addr').onkeydown = e => {
+  const items = $('addrResults').querySelectorAll('li:not(.empty)');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (!items.length) return;
+    acIdx = (acIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle('hi', i === acIdx));
+  } else if (e.key === 'Enter') { e.preventDefault(); pickHit(Math.max(acIdx, 0)); }
+  else if (e.key === 'Escape') showHits([]);
+};
+$('addr').onblur = () => setTimeout(() => showHits([]), 150);
+
+$('bulkToggle').onclick = () => {
+  const open = $('bulk').hidden;
+  $('bulk').hidden = !open; $('single').hidden = open;
+  $('bulkToggle').textContent = open ? 'Type one' : 'Paste a list';
+};
+$('bulkGo').onclick = async () => {
+  const lines = $('bulkText').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return;
+  $('bulkGo').disabled = true;
+  const missed = [];
+  for (let i = 0; i < lines.length; i++) {
+    $('bulkMsg').textContent = `Looking up ${i + 1} of ${lines.length}…`;
+    try {
+      const [h] = await geocode(lines[i], 1);
+      if (h) addPoint(h.lat, h.lng, h.title + (h.place ? `, ${h.place.replace(/ \d{5}$/, '')}` : '')); else missed.push(lines[i]);
+    } catch { missed.push(lines[i]); }
+    await new Promise(r => setTimeout(r, 350));
+  }
+  $('bulkText').value = missed.join('\n');
+  $('bulkMsg').textContent = missed.length ? `${missed.length} not found in Connecticut (left in the box).` : `Added ${lines.length}.`;
+  $('bulkGo').disabled = false;
+  if (active().length) { userMoved = true; map.fitBounds(L.latLngBounds(active().map(p => [p.lat, p.lng])), { padding: [50, 50], maxZoom: 14 }); }
+};
+
+// ---------- Traffic model ----------
+// No live feed (that needs a paid key). This is a typical-congestion curve by hour and weekday:
+// multiplier on free-flow drive time. Editable in one place.
+function trafficMult(ms) {
+  const d = new Date(ms), h = d.getHours() + d.getMinutes() / 60, wd = d.getDay();
+  if (wd === 0 || wd === 6) return h >= 11 && h < 17 ? 1.10 : 1.0;
+  const bump = (peak, width, amt) => amt * Math.exp(-((h - peak) ** 2) / (2 * width * width));
+  const fri = wd === 5 ? 1.15 : 1;
+  return 1 + bump(8, 0.9, 0.38) + bump(17.25, 1.2, 0.45) * fri + (h >= 10 && h < 15 ? 0.05 : 0);
+}
+
+// ---------- Weather (Open-Meteo hourly forecast at each stop) ----------
+async function loadWeather(stops) {
+  const url = 'https://api.open-meteo.com/v1/forecast?' + new URLSearchParams({
+    latitude: stops.map(p => p.lat.toFixed(4)).join(','), longitude: stops.map(p => p.lng.toFixed(4)).join(','),
+    hourly: 'temperature_2m,precipitation_probability,precipitation,snowfall,weather_code,wind_gusts_10m',
+    temperature_unit: 'fahrenheit', wind_speed_unit: 'mph', precipitation_unit: 'inch', timeformat: 'unixtime', forecast_days: 10 });
+  const data = await (await fetch(url)).json();
+  return (Array.isArray(data) ? data : [data]).map(d => d.hourly);
+}
+function wxAt(k, ms) {
+  const h = weather && weather[k]; if (!h) return null;
+  const i = Math.floor((ms / 1000 - h.time[0]) / 3600);
+  if (i < 0 || i >= h.time.length) return null;
+  return { temp: h.temperature_2m[i], pp: h.precipitation_probability[i] ?? 0, rain: h.precipitation[i] || 0, snow: h.snowfall[i] || 0, code: h.weather_code[i], gust: h.wind_gusts_10m[i] || 0 };
+}
+const wxIcon = w => w.snow > 0 || (w.code >= 71 && w.code <= 77) || w.code === 85 || w.code === 86 ? '❄️' : w.code >= 95 ? '⛈️'
+  : w.code >= 51 ? '🌧️' : w.code === 45 || w.code === 48 ? '🌫️' : w.code >= 2 ? '☁️' : w.code === 1 ? '🌤️' : '☀️';
+function wxMult(w) {
+  if (!w) return 1;
+  if (w.snow >= 0.4) return 1.5;
+  if (w.snow > 0) return 1.3;
+  if (w.rain >= 0.15) return 1.2;
+  if (w.rain >= 0.02 || w.code === 45 || w.code === 48) return 1.1;
+  return 1;
+}
+function wxProblem(w) {
+  if (!w) return null;
+  if (w.snow > 0) return 'snow';
+  if (w.rain >= 0.15) return 'heavy rain';
+  if (w.code === 45 || w.code === 48) return 'fog';
+  if (w.gust >= 40) return `${Math.round(w.gust)} mph gusts`;
+  if (w.temp <= 32 && w.rain > 0) return 'freezing rain';
+  return null;
+}
+
+// ---------- Terrain (elevation sampled along the route) ----------
+async function loadClimb(latlngs) {
+  const N = Math.min(300, latlngs.length), pick = [];
+  for (let i = 0; i < N; i++) pick.push(latlngs[Math.round(i * (latlngs.length - 1) / (N - 1))]);
+  const chunks = []; for (let i = 0; i < pick.length; i += 100) chunks.push(pick.slice(i, i + 100));
+  const parts = await Promise.all(chunks.map(async c => {
+    const url = 'https://api.open-meteo.com/v1/elevation?' + new URLSearchParams({ latitude: c.map(p => p[0].toFixed(4)).join(','), longitude: c.map(p => p[1].toFixed(4)).join(',') });
+    return (await (await fetch(url)).json()).elevation;
+  }));
+  const el = parts.flat(); let gain = 0, ref = el[0];
+  for (const e of el) { if (e - ref > 3) { gain += e - ref; ref = e; } else if (e < ref) ref = e; }
+  return { gain, high: Math.max(...el) };
+}
+
+// ---------- Trip simulation: walk the legs from a departure time ----------
+const departMs = () => new Date($('depart').value).getTime();
+function simulate(start) {
+  const dwell = Math.max(0, +$('dwell').value || 0) * 60000, n = active().length;
+  let t = start, drive = 0, free = 0;
+  const arrive = [start];
+  plan.legs.forEach((leg, i) => {
+    let left = leg.dur; free += leg.dur;
+    while (left > 0) {                         // 10-minute slices so long legs cross rush hour correctly
+      const slice = Math.min(600, left), m = trafficMult(t) * wxMult(wxAt(i % n, t));
+      t += slice * m * 1000; drive += slice * m; left -= slice;
+    }
+    arrive.push(t);
+    if (i < plan.legs.length - 1) t += dwell;
+  });
+  return { arrive, drive, free, end: t };
+}
+function fuel(sim) {
+  const miles = plan.dist / 1609.344, mpg = Math.max(1, +$('mpg').value || 25);
+  // Stop-and-go burns extra fuel; climbing costs m·g·h against ~25% engine efficiency (121 MJ per gallon).
+  const congestion = 1 + 0.4 * (sim.drive / sim.free - 1);
+  const climbGal = plan.climb ? 1700 * 9.81 * plan.climb.gain / (0.25 * 121e6) : 0;
+  const gal = miles / mpg * congestion + climbGal;
+  return { miles, gal, cost: gal * (+$('gas').value || 0) };
+}
+
+// ---------- Route solving ----------
+const OSRM = 'https://router.project-osrm.org';
+const coordStr = pts => pts.map(p => `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`).join(';');
+function tourCost(order, M, loop) {
+  let c = 0;
+  for (let i = 0; i < order.length - 1; i++) c += M[order[i]][order[i + 1]];
+  return loop ? c + M[order[order.length - 1]][order[0]] : c;
+}
+// Nearest-neighbour start, then 2-opt and or-opt until nothing improves. Stop 0 stays first.
+function solveOrder(M, loop) {
+  const n = M.length, order = [0], left = new Set(Array.from({ length: n - 1 }, (_, i) => i + 1));
+  while (left.size) {
+    const last = order[order.length - 1]; let b = null;
+    for (const j of left) if (b === null || M[last][j] < M[last][b]) b = j;
+    order.push(b); left.delete(b);
+  }
+  let best = tourCost(order, M, loop), improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 1; i < n - 1; i++) for (let k = i + 1; k < n; k++) {
+      const cand = order.slice(0, i).concat(order.slice(i, k + 1).reverse(), order.slice(k + 1)), c = tourCost(cand, M, loop);
+      if (c < best - 1e-6) { order.splice(0, n, ...cand); best = c; improved = true; }
+    }
+    for (let i = 1; i < n; i++) for (let j = 1; j < n; j++) {
+      if (i === j) continue;
+      const cand = order.slice(); const [s] = cand.splice(i, 1); cand.splice(j, 0, s);
+      const c = tourCost(cand, M, loop);
+      if (c < best - 1e-6) { order.splice(0, n, ...cand); best = c; improved = true; }
+    }
+  }
+  return order;
+}
+function decodePolyline6(str) {
+  const out = []; let i = 0, lat = 0, lng = 0;
+  const next = () => { let r = 0, s = 0, b; do { b = str.charCodeAt(i++) - 63; r |= (b & 31) << s; s += 5; } while (b >= 32); return r & 1 ? ~(r >> 1) : r >> 1; };
+  while (i < str.length) { lat += next(); lng += next(); out.push([lat / 1e6, lng / 1e6]); }
+  return out;
+}
+async function fetchOsrmRoute(path) {
+  const r = await (await fetch(`${OSRM}/route/v1/driving/${coordStr(path)}?overview=full&geometries=geojson`)).json();
+  if (r.code !== 'Ok') throw new Error(r.message || r.code);
+  const rt = r.routes[0];
+  return { latlngs: rt.geometry.coordinates.map(([x, y]) => [y, x]), legs: rt.legs.map(l => ({ dur: l.duration, dist: l.distance })), dist: rt.distance };
+}
+// Main-roads routing uses Valhalla, which can be told to favour highways and penalise local/service streets.
+async function fetchMainRoadRoute(path) {
+  const res = await fetch('https://valhalla1.openstreetmap.de/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+    locations: path.map(p => ({ lat: p.lat, lon: p.lng })), costing: 'auto', units: 'miles', directions_type: 'none',
+    costing_options: { auto: { use_highways: 1, use_living_streets: 0, use_tracks: 0, service_penalty: 120 } } }) });
+  const r = await res.json();
+  if (!r.trip) throw new Error(r.error || 'main-road routing unavailable');
+  const legs = r.trip.legs.map(l => ({ dur: l.summary.time, dist: l.summary.length * 1609.344 }));
+  return { latlngs: r.trip.legs.flatMap(l => decodePolyline6(l.shape)), legs, dist: legs.reduce((a, l) => a + l.dist, 0) };
+}
+
+async function buildRoute(optimize) {
+  const out = $('routeOut');
+  if (active().length < 2) { renderPlan(); return; }
+  const loop = $('roundTrip').checked, goal = $('goal').value;
+  $('optBtn').disabled = $('drawBtn').disabled = true;
+  out.className = 'hint'; out.textContent = 'Working out the route…';
+  try {
+    let saved = null;
+    if (optimize && active().length > 2) {
+      const act = active();
+      const t = await (await fetch(`${OSRM}/table/v1/driving/${coordStr(act)}?annotations=duration,distance`)).json();
+      if (t.code !== 'Ok') throw new Error(t.message || t.code);
+      const M = goal === 'dist' ? t.distances : t.durations;
+      if (M.some(r => r.some(v => v === null))) throw new Error('a stop cannot be reached by road');
+      const before = act.map((_, i) => i), order = solveOrder(M, loop);
+      saved = { sec: tourCost(before, t.durations, loop) - tourCost(order, t.durations, loop), m: tourCost(before, t.distances, loop) - tourCost(order, t.distances, loop) };
+      points = order.map(i => act[i]).concat(points.filter(p => !p.on));
+    }
+    const act = active(), path = loop ? act.concat(act[0]) : act;
+    let route, fellBack = false;
+    if ($('mainRoads').checked) { try { route = await fetchMainRoadRoute(path); } catch { fellBack = true; } }
+    if (!route) route = await fetchOsrmRoute(path);
+    plan = { ...route, saved, optimized: optimize, mainRoads: $('mainRoads').checked && !fellBack, fellBack, climb: null };
+    weather = null;
+    routeLayer.clearLayers();
+    L.polyline(plan.latlngs, { color: '#fff', weight: 8, opacity: .9, interactive: false }).addTo(routeLayer);
+    const line = L.polyline(plan.latlngs, { color: '#1c64f2', weight: 4.5, interactive: false }).addTo(routeLayer);
+    userMoved = true; map.fitBounds(line.getBounds(), { padding: [40, 40] });
+    renderPoints(); renderPlan();
+    // Weather and terrain load after the line is up; the plan refreshes as each arrives.
+    const mine = plan;
+    loadWeather(act).then(w => { if (plan === mine) { weather = w; renderPoints(); renderPlan(); } }).catch(() => { if (plan === mine) { plan.wxFailed = true; renderPlan(); } });
+    loadClimb(plan.latlngs).then(c => { if (plan === mine) { plan.climb = c; renderPlan(); } }).catch(() => {});
+  } catch (err) {
+    out.className = 'hint'; out.textContent = `Could not build the route: ${err.message}`;
+  } finally {
+    $('optBtn').disabled = $('drawBtn').disabled = false;
+  }
+}
+
+// ---------- Trip plan panel ----------
+function daySlots() {
+  const d = new Date(departMs()); d.setHours(5, 0, 0, 0);
+  return Array.from({ length: 33 }, (_, i) => d.getTime() + i * 30 * 60000);   // 5:00 AM to 9:00 PM
+}
+function renderPlan() {
+  const out = $('routeOut');
+  if (!plan) {
+    out.className = 'hint';
+    out.textContent = active().length < 2 ? 'Stop 1 is the starting point. Add at least two stops, then optimize.' : 'Press Optimize route to plan this trip.';
+    return;
+  }
+  const dep = departMs();
+  if (isNaN(dep)) { out.className = 'hint'; out.textContent = 'Pick a leaving time.'; return; }
+  const sim = simulate(dep), f = fuel(sim), n = active().length, loop = plan.legs.length === n;
+  const delay = sim.drive - sim.free;
+  const slots = daySlots().map(t => ({ t, past: t < Date.now() - 60000, drive: simulate(t).drive }));
+  const open = slots.filter(s => !s.past);
+  const best = open.reduce((a, s) => (!a || s.drive < a.drive - 30 ? s : a), null);
+  const hi = Math.max(...slots.map(s => s.drive)), lo = Math.min(...slots.map(s => s.drive));
+
+  let h = `<div class="stats">
+    <div><strong>${fmtDur(sim.drive)}</strong><span>driving${delay > 90 ? `, incl. ${fmtDur(delay)} of delay` : ', clear roads'}</span></div>
+    <div><strong>${f.miles.toFixed(1)} mi</strong><span>${plan.mainRoads ? 'on main roads' : 'total distance'}</span></div>
+    <div><strong>$${f.cost.toFixed(2)}</strong><span>${f.gal.toFixed(1)} gal of gas</span></div>
+    <div><strong>${plan.climb ? Math.round(plan.climb.gain * 3.281).toLocaleString() + ' ft' : '…'}</strong><span>${plan.climb ? `climbing, peak ${Math.round(plan.climb.high * 3.281).toLocaleString()} ft` : 'checking terrain'}</span></div>
+  </div>
+  <div class="note">Leave <b>${fmtClock(dep)}</b>, ${loop ? 'back at stop 1 by' : 'done at the last stop by'} <b>${fmtClock(sim.end)}</b>${new Date(sim.end).getDate() !== new Date(dep).getDate() ? ' the next day' : ''}.</div>`;
+
+  if (plan.optimized && plan.saved) {
+    const gal = plan.saved.m / 1609.344 / Math.max(1, +$('mpg').value || 25), usd = gal * (+$('gas').value || 0);
+    h += plan.saved.sec > 30 || plan.saved.m > 300
+      ? `<div class="note good">Reordering saves about ${fmtDur(Math.max(0, plan.saved.sec))}, ${(plan.saved.m / 1609.344).toFixed(1)} mi and $${Math.max(0, usd).toFixed(2)} in gas.</div>`
+      : `<div class="note good">Your order was already the best found.</div>`;
+  }
+  if (plan.fellBack) h += `<div class="note warn">Main-road routing was unavailable, so this is the standard fastest route.</div>`;
+
+  // Weather warnings along the way
+  const probs = [];
+  active().forEach((p, k) => { const pr = wxProblem(wxAt(k, sim.arrive[k])); if (pr) probs.push(`${pr} at ${p.label.split(',')[0]} around ${fmtClock(sim.arrive[k])}`); });
+  if (probs.length) h += `<div class="note warn">Weather: ${probs.join('; ')}. Drive time already allows for it.</div>`;
+  else if (weather && !wxAt(0, dep)) h += `<div class="note">No forecast that far out, so weather is not counted.</div>`;
+  else if (plan.wxFailed) h += `<div class="note">Weather could not be loaded, so it is not counted.</div>`;
+  else if (!weather) h += `<div class="note">Checking the forecast…</div>`;
+
+  if (best && sim.drive - best.drive > 120) h += `<div class="note good">Leaving at ${fmtClock(best.t)} instead saves ${fmtDur(sim.drive - best.drive)} of driving. <button class="link" id="useBest">Use it</button></div>`;
+  else if (best) h += `<div class="note good">This is about as good a leaving time as the day offers.</div>`;
+
+  h += `<div class="chart">${slots.map((s, i) => {
+    const pct = hi - lo < 1 ? 30 : 18 + 82 * (s.drive - lo) / (hi - lo);
+    const sel = Math.abs(s.t - dep) < 15 * 60000;
+    return `<i data-i="${i}" class="${s.past ? 'past' : ''} ${best && s.t === best.t ? 'best' : ''} ${sel ? 'sel' : ''}" style="height:${pct}%" title="Leave ${fmtClock(s.t)}: ${fmtDur(s.drive)} driving"></i>`;
+  }).join('')}</div>
+  <div class="axis"><span>5 AM</span><span>9 AM</span><span>1 PM</span><span>5 PM</span><span>9 PM</span></div>
+  <div class="legend"><span><i style="background:var(--route)"></i>your time</span><span><i style="background:var(--accent)"></i>best time</span><span>taller = more driving · click a bar</span></div>
+  <p class="hint">Traffic is a typical weekday/weekend pattern, not a live feed. Weather is the hourly forecast at each stop.</p>`;
+
+  out.className = ''; out.innerHTML = h;
+  out.querySelectorAll('.chart i:not(.past)').forEach(b => b.onclick = () => setDepart(slots[+b.dataset.i].t));
+  if ($('useBest')) $('useBest').onclick = () => setDepart(best.t);
+}
+function setDepart(ms) {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+  $('depart').value = d.toISOString().slice(0, 16);
+  renderPoints(); renderPlan();
+}
+
+// ---------- Settings ----------
+['dwell', 'mpg', 'gas'].forEach(id => {
+  $(id).value = store.get('ct-' + id, $(id).value);
+  $(id).oninput = () => { store.set('ct-' + id, $(id).value); renderPoints(); renderPlan(); };
+});
+$('depart').onchange = () => { renderPoints(); renderPlan(); };
+$('optBtn').onclick = () => buildRoute(true);
+$('drawBtn').onclick = () => buildRoute(false);
+['roundTrip', 'mainRoads', 'goal'].forEach(id => $(id).onchange = () => { if (plan) buildRoute(plan.optimized); });
+setDepart(Math.ceil((Date.now() + 10 * 60000) / (30 * 60000)) * 30 * 60000);   // next half hour
+
+// Keep the map sized to its container; frame the whole state until the user moves it.
+map.on('mousedown wheel touchstart', () => { userMoved = true; });
+new ResizeObserver(() => {
+  map.invalidateSize();
+  if (!userMoved && !selected.size) map.fitBounds(CT_BOUNDS, { animate: false });
+}).observe($('map'));
+
+renderTowns();
+renderPoints();
+renderPlan();
+</script>
+</body>
+</html>
